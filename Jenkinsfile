@@ -2,12 +2,12 @@ pipeline {
     agent any
 
     tools {
-      maven 'MAVEN_HOME'
-      jdk 'JAVA_HOME'
+        maven '3.6.3'
+        dockerTool 'latest'
     }
 
     environment {
-        DOCKER_IMAGE = 'my-spring-boot-image'
+        DOCKER_IMAGE = 'jarrettoswald/my-spring-boot-image:latest'
     }
 
     stages {
@@ -17,18 +17,25 @@ pipeline {
             }
         }
 
-        stage('Build Docker image') {
+        stage('mvn clean package') {
             steps {
-                sh 'mvn spring-boot:build-image -Dspring-boot.build-image.imageName=$DOCKER_IMAGE'
+                sh 'mvn clean package'
             }
         }
 
-        stage('Verify Docker image') {
+        stage('Build Docker Image') {
             steps {
-                script {
-                    def img = docker.image("$DOCKER_IMAGE")
-                    img.pull()
-                    img.run('java -version')
+                sh 'docker build -t $DOCKER_IMAGE .'
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                    sh '''
+                      docker login -u $USERNAME -p $PASSWORD
+                      docker push $DOCKER_IMAGE
+                    '''
                 }
             }
         }
